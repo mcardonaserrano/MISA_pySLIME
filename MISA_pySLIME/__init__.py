@@ -6,7 +6,7 @@ ensure_data()
 
 __version__ = "2.0.6"
 
-from .pySLIME import (
+from .MISA_pySLIME import (
     get_lat_lon,
     get_az_alt,
     query_model,

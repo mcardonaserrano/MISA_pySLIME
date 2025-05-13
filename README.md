@@ -52,18 +52,19 @@ If the files already exist locally, the library will skip the download step and 
 ### 🚀 Quickstart
 
 Here's how you can use the model to predict electron density over 24 hours:
+
 ```python
-from pySLIME import predict_ne, predict_ti, predict_te
+from MISA_pySLIME import predict_ne, predict_ti, predict_te
 
 # Example: predict electron density (Ne) at azimuth=-80°, altitude=350 km,
 # DOY=99, UT=12.5 in 2024:
 ne = predict_ne(
-    doy=99,
-    time=12.5,
-    year=2024,
-    coords=(-80, 350),
-    input_coords='az_alt',  # or 'lat_lon'
-    time_ref='ut'           # 'slt' or 'ut'
+  doy=99,
+  time=12.5,
+  year=2024,
+  coords=(-80, 350),
+  input_coords='az_alt',  # or 'lat_lon'
+  time_ref='ut'  # 'slt' or 'ut'
 )
 print(f"Predicted Ne: {ne:.3e} m⁻³")
 ```

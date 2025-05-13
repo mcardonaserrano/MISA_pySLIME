@@ -3,17 +3,25 @@ import pandas as pd
 import xarray as xr
 from tqdm import tqdm
 from scipy.interpolate import LinearNDInterpolator
+import os
+import netCDF4
+
+# -- Define paths to large ancillary NetCDFs (downloaded at install/runtime) --
+BASE_DIR       = os.path.dirname(__file__)
+PROCESSED_DIR  = os.path.join(BASE_DIR, 'ancillary', 'processed_ncs')
+MASTER_GEO_PATH = os.path.join(PROCESSED_DIR, 'master_geo_ds_2.0.6.nc')
+master_geo_ds  = xr.load_dataset(MASTER_GEO_PATH,engine='netcdf4')
 
 # -- Load geophysical index master dataset --
-master_geo_ds = xr.load_dataset('../ancillary/master_geo_ds_2.0.6.nc')
-
 # -- Load trained binned-regression model dictionaries for Ne, Ti, Te --
-ne_model_dict = np.load('../model/ne_model_2_0_5.npy', allow_pickle=True).item()
-ti_model_dict = np.load('../model/ti_model_2_0_5.npy', allow_pickle=True).item()
-te_model_dict = np.load('../model/te_model_2_0_5.npy', allow_pickle=True).item()
+MODEL_DIR      = os.path.join(BASE_DIR, 'model')
+ne_model_dict = np.load(os.path.join(MODEL_DIR, 'ne_model_2_0_5.npy'), allow_pickle=True).item()
+ti_model_dict = np.load(os.path.join(MODEL_DIR, 'ti_model_2_0_5.npy'), allow_pickle=True).item()
+te_model_dict = np.load(os.path.join(MODEL_DIR, 'te_model_2_0_5.npy'), allow_pickle=True).item()
 
 # -- Precompute bidirectional interpolators between (az, alt) and (lat, lon) --
-grid_ds = xr.load_dataset('../ancillary/grid_ds_2.0.6.nc')
+GRID_PATH = os.path.join(PROCESSED_DIR, 'grid_ds_2.0.6.nc')
+grid_ds   = xr.load_dataset(GRID_PATH)
 flat_alt      = grid_ds['gdalt'].values.flatten()
 normalized_az = ((grid_ds['az1'] + grid_ds['az2']) / 2).values
 flat_gdlat    = grid_ds['gdlat'].values.flatten()

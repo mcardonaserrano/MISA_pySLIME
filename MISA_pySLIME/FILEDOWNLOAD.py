@@ -4,12 +4,12 @@ import requests
 import zipfile
 
 # Dropbox URLs for required files (direct‐download)
-MISA_DS_URL      = "https://www.dropbox.com/scl/fi/59ypmunnxai36c1rn1ury/MISA_ds_2.0.6.nc.zip?dl=1"
-GEO_DS_URL       = "https://www.dropbox.com/scl/fi/d5bpuc0w1lpagqvi70gea/master_geo_ds_2.0.6.nc?dl=1"
+MISA_DS_URL      = "https://www.dropbox.com/scl/fi/59ypmunnxai36c1rn1ury/MISA_ds_2.0.6.nc.zip?rlkey=fh4f9o71ffh94h9n9da93lxf3&st=fylj904e&dl=1"
+GEO_DS_URL       = "https://www.dropbox.com/scl/fi/d5bpuc0w1lpagqvi70gea/master_geo_ds_2.0.6.nc?rlkey=g2m2jn5woavpbs1go20dt52xv&st=bw4zlfhd&dl=1"
 
 # Where to save them in your repo
-MISA_DS_PATH     = os.path.join(os.path.dirname(__file__), "ancillary", "grid_ds_2.0.6.nc")
-MASTER_GEO_PATH  = os.path.join(os.path.dirname(__file__), "ancillary", "master_geo_ds_2.0.6.nc")
+MISA_DS_PATH     = os.path.join(os.path.dirname(__file__), "ancillary","processed_ncs", "MISA_ds_2.0.6.nc")
+MASTER_GEO_PATH  = os.path.join(os.path.dirname(__file__), "ancillary","processed_ncs", "master_geo_ds_2.0.6.nc")
 
 def download_file(url, save_path, unzip=False):
     """Download a file from URL if it doesn't already exist."""
