@@ -3,6 +3,7 @@ import pandas as pd
 import xarray as xr
 from tqdm import tqdm
 from scipy.interpolate import LinearNDInterpolator
+from scipy.spatial import cKDTree
 import os
 import netCDF4
 
@@ -20,55 +21,89 @@ ti_model_dict = np.load(os.path.join(MODEL_DIR, 'ti_model_2_0_5.npy'), allow_pic
 te_model_dict = np.load(os.path.join(MODEL_DIR, 'te_model_2_0_5.npy'), allow_pickle=True).item()
 
 # -- Precompute bidirectional interpolators between (az, alt) and (lat, lon) --
-GRID_PATH = os.path.join(PROCESSED_DIR, 'grid_ds_2.0.6.nc')
+GRID_PATH = os.path.join(PROCESSED_DIR, 'grid_ds_2.0.7.nc')
 grid_ds   = xr.load_dataset(GRID_PATH)
 flat_alt      = grid_ds['gdalt'].values.flatten()
-normalized_az = ((grid_ds['az1'] + grid_ds['az2']) / 2).values
+flat_az       = grid_ds['az_normalized'].values.flatten()
 flat_gdlat    = grid_ds['gdlat'].values.flatten()
 flat_glon     = grid_ds['glon'].values.flatten()
-az_repeated   = np.repeat(normalized_az, grid_ds.sizes['range'])
 interp_df = pd.DataFrame({
-    'az':  az_repeated,
+    'az':  flat_az,
     'alt': flat_alt,
     'lat': flat_gdlat,
     'lon': flat_glon
 }).dropna()
 # forward mapping: (az, alt) -> (lat, lon)
-fwd_pts    = interp_df[['az', 'alt']].values
-lat_vals   = interp_df['lat'].values
-lon_vals   = interp_df['lon'].values
+fwd_pts = interp_df[['az', 'alt']].values
+lat_vals = interp_df['lat'].values
+lon_vals = interp_df['lon'].values
 # inverse mapping: (lat, lon) -> (az, alt)
-inv_pts    = interp_df[['lat', 'lon']].values
-az_vals    = interp_df['az'].values
-alt_vals   = interp_df['alt'].values
+inv_pts = interp_df[['lat', 'lon']].values
+az_vals = interp_df['az'].values
+alt_vals = interp_df['alt'].values
 lat_interpolator = LinearNDInterpolator(fwd_pts, lat_vals)
 lon_interpolator = LinearNDInterpolator(fwd_pts, lon_vals)
-az_interpolator  = LinearNDInterpolator(inv_pts, az_vals)
+az_interpolator = LinearNDInterpolator(inv_pts, az_vals)
 alt_interpolator = LinearNDInterpolator(inv_pts, alt_vals)
+# Build KD-trees for nearest-neighbor fallback
+fwd_tree = cKDTree(fwd_pts)  # (az, alt) -> (lat, lon)
+inv_tree = cKDTree(inv_pts)  # (lat, lon) -> (az, alt)
+# Domain bounds for more informative messages
+az_min, az_max = interp_df['az'].min(), interp_df['az'].max()
+alt_min, alt_max = interp_df['alt'].min(), interp_df['alt'].max()
+lat_min, lat_max = interp_df['lat'].min(), interp_df['lat'].max()
+lon_min, lon_max = interp_df['lon'].min(), interp_df['lon'].max()
 
 
-def get_lat_lon(az, alt):
-    """
-    Convert beam azimuth & altitude to geographic latitude & longitude.
-    """
+def get_lat_lon(az, alt, verbose=True):
     az_arr = np.asarray(az)
     alt_arr = np.asarray(alt)
     pts = np.column_stack((az_arr.ravel(), alt_arr.ravel()))
-    lat = lat_interpolator(pts).reshape(az_arr.shape)
-    lon = lon_interpolator(pts).reshape(az_arr.shape)
-    return lat, lon
+
+    lat = lat_interpolator(pts)
+    lon = lon_interpolator(pts)
+
+    # Identify NaNs and replace with nearest neighbor
+    nan_mask = np.isnan(lat) | np.isnan(lon)
+    if np.any(nan_mask):
+        bad_pts = pts[nan_mask]
+        _, idxs = fwd_tree.query(bad_pts)
+        nearest_valid = fwd_pts[idxs]
+        lat[nan_mask] = lat_interpolator(nearest_valid)
+        lon[nan_mask] = lon_interpolator(nearest_valid)
+        if verbose:
+            print(
+                f"[get_lat_lon] {np.sum(nan_mask)} out-of-bounds point(s) detected.\n"
+                f"Valid input ranges: az ∈ [{az_min:.2f}, {az_max:.2f}], alt ∈ [{alt_min:.2f}, {alt_max:.2f}].\n"
+                f"Nearest valid grid points used instead."
+            )
+
+    return lat.reshape(az_arr.shape), lon.reshape(az_arr.shape)
 
 
-def get_az_alt(lat, lon):
-    """
-    Convert geographic latitude & longitude to beam azimuth & altitude.
-    """
+def get_az_alt(lat, lon, verbose=True):
     lat_arr = np.asarray(lat)
     lon_arr = np.asarray(lon)
     pts = np.column_stack((lat_arr.ravel(), lon_arr.ravel()))
-    az  = az_interpolator(pts).reshape(lat_arr.shape)
-    alt = alt_interpolator(pts).reshape(lat_arr.shape)
-    return az, alt
+
+    az = az_interpolator(pts)
+    alt = alt_interpolator(pts)
+
+    # Identify NaNs and replace with nearest neighbor
+    nan_mask = np.isnan(az) | np.isnan(alt)
+    if np.any(nan_mask):
+        bad_pts = pts[nan_mask]
+        _, idxs = inv_tree.query(bad_pts)
+        nearest_valid = inv_pts[idxs]
+        az[nan_mask] = az_interpolator(nearest_valid)
+        alt[nan_mask] = alt_interpolator(nearest_valid)
+        if verbose:
+            print(
+                f"[get_az_alt] {np.sum(nan_mask)} out-of-bounds point(s) detected.\n"
+                f"Valid input ranges: lat ∈ [{lat_min:.2f}, {lat_max:.2f}], lon ∈ [{lon_min:.2f}, {lon_max:.2f}].\n"
+                f"Nearest valid grid points used instead."
+            )
+    return az.reshape(lat_arr.shape), alt.reshape(lat_arr.shape)
 
 
 def query_model(az, alt, doy, slt, indices, bin_models, feature_order=None):
@@ -83,28 +118,36 @@ def query_model(az, alt, doy, slt, indices, bin_models, feature_order=None):
     if feature_order is None:
         feature_order = ['doy', 'slt'] + sorted(indices.keys())
     # bin centers for fallback
-    bin_centers = {key: ((info['az_range'][0]+info['az_range'][1])/2,
-                         (info['alt_range'][0]+info['alt_range'][1])/2)
+    bin_centers = {key: ((info['az_range'][0] + info['az_range'][1]) / 2,
+                         (info['alt_range'][0] + info['alt_range'][1]) / 2)
                    for key, info in bin_models.items()}
     preds = np.full(n, np.nan)
     for i in range(n):
         # exact bin match
         sel = None
         for key, info in bin_models.items():
-            az0, az1 = info['az_range']; alt0, alt1 = info['alt_range']
+            az0, az1 = info['az_range'];
+            alt0, alt1 = info['alt_range']
             if az0 <= az_arr[i] < az1 and alt0 <= alt_arr[i] < alt1:
-                sel = info; break
+                sel = info;
+                break
         # nearest fallback
         if sel is None:
             nearest = min(bin_centers, key=lambda k: np.hypot(
-                az_arr[i]-bin_centers[k][0], alt_arr[i]-bin_centers[k][1]))
+                az_arr[i] - bin_centers[k][0], alt_arr[i] - bin_centers[k][1]))
             sel = bin_models[nearest]
         # build features
         fv = []
         for feat in feature_order:
-            if feat == 'doy': fv.append(doy_arr[i])
-            elif feat == 'slt': fv.append(slt_arr[i])
-            else: fv.append(indices[feat][i])
+            if feat == 'doy':
+                fv.append(doy_arr[i])
+            elif feat == 'slt':
+                fv.append(slt_arr[i])
+            else:
+                fv.append(indices[feat][i])
+            # check if fv contains nans-1):
+            if np.isnan(fv).any():
+                raise ValueError(f"Feature {feat} contains NaN values.")
         X = np.array([fv])
         # scale + poly
         Xs = sel['scaler'].transform(X)
@@ -125,19 +168,21 @@ def _prepare_inputs(doy, time, coords, input_coords, time_ref, year=None):
         raise ValueError('Length mismatch among recog, doy, time')
     # coords
     if input_coords == 'az_alt':
-        az, alt = coords_arr[:,0], coords_arr[:,1]
+        az, alt = coords_arr[:, 0], coords_arr[:, 1]
         lat, lon = get_lat_lon(az, alt)
     else:
-        lat, lon = coords_arr[:,0], coords_arr[:,1]
+        lat, lon = coords_arr[:, 0], coords_arr[:, 1]
         az, alt = get_az_alt(lat, lon)
     # time to slt, ut
-    if time_ref == 'slt': slt = time_arr; ut = slt - lon/15.0
-    else: ut = time_arr; slt = ut + lon/15.0
+    if time_ref == 'slt':
+        slt = time_arr; ut = slt - lon / 15.0
+    else:
+        ut = time_arr; slt = ut + lon / 15.0
     # wrap and adjust doy
     slt_mod = np.mod(slt, 24)
     ut_mod = np.mod(ut, 24)
     doy_arr += ((slt < 0).astype(int) - (slt >= 24).astype(int)
-              + (ut < 0).astype(int) - (ut >= 24).astype(int))
+                + (ut < 0).astype(int) - (ut >= 24).astype(int))
     return az, alt, doy_arr, slt_mod, ut_mod
 
 
@@ -164,14 +209,14 @@ def predict_generic(doy, time, coords, model_dict, target_indices,
         # build index dict
         idxs = {feat: float(ds_doy[feat].values[idx]) for feat in target_indices}
         preds.append(query_model(az[i], alt[i], doy_arr[i], slt[i], idxs, model_dict,
-                                 ['doy','slt']+target_indices))
+                                 ['doy', 'slt'] + target_indices))
     out = np.array(preds)
     return out[0] if out.size == 1 else out
 
 # Convenience wrappers
 predict_ne = lambda doy, time, coords, **kw: predict_generic(
-    doy, time, coords, ne_model_dict, ['fism2_48hr_prior','ap_7hr_prior'], **kw)
+    doy, time, coords, ne_model_dict, ['fism2_48hr_prior', 'ap_7hr_prior'], **kw)
 predict_ti = lambda doy, time, coords, **kw: predict_generic(
-    doy, time, coords, ti_model_dict, ['fism2_48hr_prior','ap_7hr_prior'], **kw)
+    doy, time, coords, ti_model_dict, ['fism2_48hr_prior', 'ap_7hr_prior'], **kw)
 predict_te = lambda doy, time, coords, **kw: predict_generic(
-    doy, time, coords, te_model_dict, ['fism2_48hr_prior','ap_7hr_prior'], **kw)
+    doy, time, coords, te_model_dict, ['fism2_48hr_prior', 'ap_7hr_prior'], **kw)
