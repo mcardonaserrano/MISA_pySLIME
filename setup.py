@@ -9,7 +9,7 @@ long_description = (HERE / 'README.md').read_text(encoding='utf-8')
 
 setup(
     name='MISA_pySLIME',
-    version='2.0.8b1',
+    version='2.0.8b2',
     description='Millstone Hill Incoherent Scatter Radar Spatial-Linear Ionospheric Modeling Engine',
     long_description=long_description,
     long_description_content_type='text/markdown',
