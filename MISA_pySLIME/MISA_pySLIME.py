@@ -16,12 +16,12 @@ master_geo_ds  = xr.load_dataset(MASTER_GEO_PATH,engine='netcdf4')
 # -- Load geophysical index master dataset --
 # -- Load trained binned-regression model dictionaries for Ne, Ti, Te --
 MODEL_DIR      = os.path.join(BASE_DIR, 'model')
-ne_model_dict = np.load(os.path.join(MODEL_DIR, 'ne_model_2_0_5.npy'), allow_pickle=True).item()
-ti_model_dict = np.load(os.path.join(MODEL_DIR, 'ti_model_2_0_5.npy'), allow_pickle=True).item()
-te_model_dict = np.load(os.path.join(MODEL_DIR, 'te_model_2_0_5.npy'), allow_pickle=True).item()
+ne_model_dict = np.load(os.path.join(MODEL_DIR, 'ne_model_2_0_8.npy'), allow_pickle=True).item()
+ti_model_dict = np.load(os.path.join(MODEL_DIR, 'ti_model_2_0_8.npy'), allow_pickle=True).item()
+te_model_dict = np.load(os.path.join(MODEL_DIR, 'te_model_2_0_8.npy'), allow_pickle=True).item()
 
 # -- Precompute bidirectional interpolators between (az, alt) and (lat, lon) --
-GRID_PATH = os.path.join(PROCESSED_DIR, 'grid_ds_2.0.7.nc')
+GRID_PATH = os.path.join(PROCESSED_DIR, 'grid_ds_2.0.8.nc')
 grid_ds   = xr.load_dataset(GRID_PATH)
 flat_alt      = grid_ds['gdalt'].values.flatten()
 flat_az       = grid_ds['az_normalized'].values.flatten()
