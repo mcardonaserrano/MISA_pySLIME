@@ -143,6 +143,12 @@ def query_model(az, alt, doy, slt, indices, bin_models, feature_order=None):
                 fv.append(doy_arr[i])
             elif feat == 'slt':
                 fv.append(slt_arr[i])
+                fv.append(np.sin(2 * np.pi * slt_arr[i] / 24))
+                fv.append(np.cos(2 * np.pi * slt_arr[i] / 24))
+                fv.append(np.sin(4 * np.pi * slt_arr[i] / 24))
+                fv.append(np.cos(4 * np.pi * slt_arr[i] / 24))
+                fv.append(np.sin(8 * np.pi * slt_arr[i] / 24))
+                fv.append(np.cos(8 * np.pi * slt_arr[i] / 24))
             else:
                 fv.append(indices[feat][i])
             # check if fv contains nans-1):
