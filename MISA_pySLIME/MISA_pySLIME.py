@@ -10,13 +10,13 @@ import netCDF4
 # -- Define paths to large ancillary NetCDFs (downloaded at install/runtime) --
 BASE_DIR       = os.path.dirname(__file__)
 PROCESSED_DIR  = os.path.join(BASE_DIR, 'ancillary', 'processed_ncs')
-MASTER_GEO_PATH = os.path.join(PROCESSED_DIR, 'master_geo_ds_2.0.6.nc')
+MASTER_GEO_PATH = os.path.join(PROCESSED_DIR, 'master_geo_ds_2.0.10.nc')
 master_geo_ds  = xr.load_dataset(MASTER_GEO_PATH,engine='netcdf4')
 
 # -- Load geophysical index master dataset --
 # -- Load trained binned-regression model dictionaries for Ne, Ti, Te --
 MODEL_DIR      = os.path.join(BASE_DIR, 'model')
-ne_model_dict = np.load(os.path.join(MODEL_DIR, 'ne_model_2_0_10.npy'), allow_pickle=True).item()
+ne_model_dict = np.load(os.path.join(MODEL_DIR, 'ne_model_2_0_11.npy'), allow_pickle=True).item()
 ti_model_dict = np.load(os.path.join(MODEL_DIR, 'ti_model_2_0_10.npy'), allow_pickle=True).item()
 te_model_dict = np.load(os.path.join(MODEL_DIR, 'te_model_2_0_10.npy'), allow_pickle=True).item()
 
@@ -223,7 +223,7 @@ def predict_generic(doy, time, coords, model_dict, target_indices,
 
 # Convenience wrappers
 predict_ne = lambda doy, time, coords, **kw: predict_generic(
-    doy, time, coords, ne_model_dict, ['fism2_48hr_prior', 'ap_7hr_prior'], **kw)
+    doy, time, coords, ne_model_dict, ['fism2_48hr_prior', 'kp_7hr_prior'], **kw)
 predict_ti = lambda doy, time, coords, **kw: predict_generic(
     doy, time, coords, ti_model_dict, ['fism2_48hr_prior', 'ap_7hr_prior'], **kw)
 predict_te = lambda doy, time, coords, **kw: predict_generic(
