@@ -171,8 +171,13 @@ def _prepare_inputs(doy, time, coords, input_coords, time_ref, year):
     time_arr = np.atleast_1d(time).astype(float)
     coords_arr = np.atleast_2d(coords).astype(float)
     year_arr = np.atleast_1d(year).astype(float)
-    if doy_arr.size != coords_arr.shape[0] or time_arr.size != coords_arr.shape[0] or year_arr.size != coords_arr.shape[0]:
-        raise ValueError('Length mismatch among coords, doy, time, or year')
+    if doy_arr.size != coords_arr.shape[0] or time_arr.size != coords_arr.shape[0]:
+        raise ValueError(f'Length mismatch among coords, doy, or time\n shapes: {coords_arr.shape}, {doy_arr.shape}, {time_arr.shape}')
+    # extend year if scalar
+    if year_arr.size > 1 and year_arr.size != coords_arr.shape[0]:
+        raise ValueError('Year must be a scalar or match the length of coords.')
+    if year_arr.size == 1:
+        year_arr = year_arr * np.ones(coords_arr.shape[0])
     # coords
     if input_coords == 'az_alt':
         az, alt = coords_arr[:, 0], coords_arr[:, 1]
