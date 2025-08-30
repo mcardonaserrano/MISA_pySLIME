@@ -163,7 +163,7 @@ def query_model(az, alt, doy, slt, indices, bin_models, feature_order=None):
     return preds[0] if n == 1 else preds
 
 
-def _prepare_inputs(doy, time, coords, input_coords, time_ref, year):
+def _prepare_inputs(doy, time, coords, input_coords, time_ref, year=None):
     """
     Helper to convert and wrap inputs for generic prediction.
     """
@@ -173,12 +173,7 @@ def _prepare_inputs(doy, time, coords, input_coords, time_ref, year):
     year_arr = np.atleast_1d(year).astype(float)
     if doy_arr.size != coords_arr.shape[0] or time_arr.size != coords_arr.shape[0]:
         raise ValueError(f'Length mismatch among coords, doy, or time\n shapes: {coords_arr.shape}, {doy_arr.shape}, {time_arr.shape}')
-    # extend year if scalar
-    if year_arr.size > 1 and year_arr.size != coords_arr.shape[0]:
-        raise ValueError('Year must be a scalar or match the length of coords.')
-    if year_arr.size == 1:
-        year_arr = year_arr * np.ones(coords_arr.shape[0])
-    # coords
+
     if input_coords == 'az_alt':
         az, alt = coords_arr[:, 0], coords_arr[:, 1]
         lat, lon = get_lat_lon(az, alt)
@@ -195,7 +190,7 @@ def _prepare_inputs(doy, time, coords, input_coords, time_ref, year):
     ut_mod = np.mod(ut, 24)
     doy_arr += ((slt < 0).astype(int) - (slt >= 24).astype(int)
                 + (ut < 0).astype(int) - (ut >= 24).astype(int))
-    return az, alt, doy_arr, slt_mod, ut_mod, year_arr
+    return az, alt, doy_arr, slt_mod, ut_mod
 
 
 def predict_generic(doy, time, coords, model_dict, target_indices,
@@ -204,17 +199,16 @@ def predict_generic(doy, time, coords, model_dict, target_indices,
     """
     Core prediction routine for ne/ti/te using a binned model dict.
     """
-    az, alt, doy_arr, slt, ut, year_arr = _prepare_inputs(
+    az, alt, doy_arr, slt, ut = _prepare_inputs(
         doy, time, coords, input_coords, time_ref, year)
     # filter geo data by year
     preds = []
+    ds = geo_ds.sel(dates=geo_ds['dates'].dt.year == year) if year else geo_ds
+    ds_dates = ds['dates'].dt.dayofyear.values
     for i in tqdm(range(len(az)), disable=not verbose):
-        # filter by year for every row
-        ds = geo_ds.sel(dates=geo_ds['dates'].dt.year == year_arr[i]) if year_arr[i] else geo_ds
-        ds_dates = ds['dates'].dt.dayofyear.values
         # filter by doy
         mask = ds_dates == doy_arr[i]
-        if not mask.any(): raise ValueError(f'No geo data on YEAR {year_arr[i]}, DOY {doy_arr[i]}')
+        if not mask.any(): raise ValueError(f'No geo data on YEAR {year}, DOY {doy_arr[i]}')
         ds_doy = ds.isel(dates=mask)
         # closest ut
         ut_vals = ds_doy['ut'].values
