@@ -9,7 +9,7 @@ long_description = (HERE / 'README.md').read_text(encoding='utf-8')
 
 setup(
     name='MISA_pySLIME',
-    version='2.0.11.3',
+    version='2.0.12',
     description='Millstone Hill Incoherent Scatter Radar Spatial-Linear Ionospheric Modeling Engine',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -19,7 +19,7 @@ setup(
     packages=find_packages(exclude=['*.egg-info']),
     python_requires='>=3.8',
     install_requires=[
-        'numpy',
+        'numpy<2',
         'pandas',
         'xarray',
         'netCDF4',

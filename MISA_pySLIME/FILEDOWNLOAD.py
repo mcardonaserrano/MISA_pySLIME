@@ -4,7 +4,7 @@ import requests
 import zipfile
 
 # Dropbox URLs for required files (direct‐download)
-MISA_DS_URL      = "https://www.dropbox.com/scl/fi/59ypmunnxai36c1rn1ury/MISA_ds_2.0.6.nc.zip?rlkey=fh4f9o71ffh94h9n9da93lxf3&st=fylj904e&dl=1"
+MISA_DS_URL      = "https://drive.google.com/uc?export=download&id=1RHGk9-9F7AGjs6Dp1TGQGamw6KzWm1eM"
 GEO_DS_URL       = "https://www.dropbox.com/scl/fi/slo7d1iv752l5ejqpgq7x/master_geo_ds_2.0.10.nc?rlkey=etcwdxaugl9vvz4gkiqgstx6b&st=1tw5noke&dl=1"
 
 # Where to save them in your repo
